@@ -1,0 +1,161 @@
+---
+/*
+  Design switcher — copy to <routes>/<preview-base>/index.astro
+
+  1. Replace PROJECT_NAME with the project's name.
+  2. Replace PREVIEW_BASE with this folder's route segment (e.g. "preview").
+  3. Fill the designs array below.
+  4. Create one route per id at /PREVIEW_BASE/<id>.
+
+  Do not restyle this page. It is deliberately neutral so it never competes
+  with the variants it is showing.
+*/
+// EDIT THIS ARRAY ONLY. One entry per variant.
+// a = page ground, b = primary ink, c = accent. These draw the sidebar swatch,
+// so keep them honest — they are how the user scans the set at a glance.
+export const designs = [
+  { id: 1, name: 'Variant name', note: 'Three or four words', a: '#ffffff', b: '#111111', c: '#2563eb' },
+  // ...
+];
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Design switcher — PROJECT_NAME</title>
+  <link rel="icon" href="data:," />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <header>
+        <h1>PROJECT_NAME</h1>
+        <p>{designs.length} designs · pick one</p>
+      </header>
+      <nav id="nav">
+        {designs.map((d) => (
+          <button type="button" data-id={d.id} class="opt">
+            <span class="sw" style={`--a:${d.a};--b:${d.b};--c:${d.c}`}><i></i><i></i><i></i></span>
+            <span class="meta">
+              <span class="nm"><b>{String(d.id).padStart(2, '0')}</b>{d.name}</span>
+              <span class="nt">{d.note}</span>
+            </span>
+          </button>
+        ))}
+      </nav>
+      <footer>
+        <kbd>←</kbd><kbd>→</kbd> to switch
+      </footer>
+    </aside>
+
+    <main>
+      <div class="bar">
+        <div class="widths" role="group" aria-label="Viewport width">
+          <button type="button" data-w="390" class="w on">Phone</button>
+          <button type="button" data-w="768" class="w">Tablet</button>
+          <button type="button" data-w="0" class="w">Full</button>
+        </div>
+        <span class="now" id="now">01 · Quiet Editorial</span>
+        <a id="open" href="/PREVIEW_BASE/1" target="_blank" rel="noopener">Open ↗</a>
+      </div>
+      <div class="stage" id="stage">
+        <iframe id="frame" src="/PREVIEW_BASE/1" title="Design preview" loading="eager"></iframe>
+      </div>
+    </main>
+  </div>
+
+  <script is:inline define:vars={{ designs }}>
+    const frame = document.getElementById('frame');
+    const stage = document.getElementById('stage');
+    const now   = document.getElementById('now');
+    const open  = document.getElementById('open');
+    const opts  = [...document.querySelectorAll('.opt')];
+
+    let current = Number(localStorage.getItem('dp-design')) || 1;
+    let width   = localStorage.getItem('dp-width') ?? '390';
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function render() {
+      const d = designs.find((x) => x.id === current) ?? designs[0];
+      if (!frame.src.endsWith('/PREVIEW_BASE/' + d.id)) frame.src = '/PREVIEW_BASE/' + d.id;
+      now.textContent = pad(d.id) + ' · ' + d.name;
+      open.href = '/PREVIEW_BASE/' + d.id;
+      opts.forEach((o) => o.setAttribute('aria-current', String(Number(o.dataset.id) === d.id)));
+      stage.style.setProperty('--w', width === '0' ? '100%' : width + 'px');
+      document.querySelectorAll('.w').forEach((b) => b.classList.toggle('on', b.dataset.w === width));
+      localStorage.setItem('dp-design', String(current));
+      localStorage.setItem('dp-width', width);
+    }
+
+    opts.forEach((o) => o.addEventListener('click', () => { current = Number(o.dataset.id); render(); }));
+    document.querySelectorAll('.w').forEach((b) =>
+      b.addEventListener('click', () => { width = b.dataset.w; render(); })
+    );
+    addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') { current = current % designs.length + 1; render(); }
+      if (e.key === 'ArrowLeft')  { current = (current - 2 + designs.length) % designs.length + 1; render(); }
+    });
+
+    render();
+  </script>
+</body>
+</html>
+
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg: #0f1013; --panel: #17191e; --edge: #262a32;
+    --ink: #e9ebf0; --soft: #8d95a4; --accent: #7c8cff;
+  }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: Manrope, system-ui, sans-serif; }
+  .app { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); height: 100svh; }
+
+  aside { display: flex; flex-direction: column; border-right: 1px solid var(--edge); background: var(--panel); overflow-y: auto; }
+  aside header { padding: 1.15rem 1rem .75rem; }
+  aside h1 { margin: 0; font-size: .9375rem; font-weight: 800; letter-spacing: -.02em; }
+  aside header p { margin: .15rem 0 0; font-size: .75rem; color: var(--soft); }
+  nav { display: grid; gap: 2px; padding: .35rem .5rem; }
+
+  .opt {
+    display: flex; align-items: center; gap: .7rem; width: 100%;
+    padding: .55rem .6rem; background: none; border: 0; border-radius: 9px;
+    color: inherit; font: inherit; text-align: left; cursor: pointer;
+    transition: background-color 140ms ease;
+  }
+  .opt:hover { background: #1e2129; }
+  .opt[aria-current="true"] { background: #232734; box-shadow: inset 0 0 0 1px var(--accent); }
+  .sw { display: flex; flex: none; width: 2rem; height: 2rem; border-radius: 6px; overflow: hidden; border: 1px solid var(--edge); }
+  .sw i { flex: 1; }
+  .sw i:nth-child(1) { background: var(--a); flex: 2.2; }
+  .sw i:nth-child(2) { background: var(--b); }
+  .sw i:nth-child(3) { background: var(--c); }
+  .meta { min-width: 0; }
+  .nm { display: block; font-size: .8125rem; font-weight: 600; }
+  .nm b { color: var(--soft); font-weight: 700; margin-right: .4rem; }
+  .nt { display: block; font-size: .6875rem; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  aside footer { margin-top: auto; padding: .85rem 1rem; font-size: .6875rem; color: var(--soft); border-top: 1px solid var(--edge); }
+  kbd { display: inline-block; padding: .05rem .3rem; margin-right: .2rem; border: 1px solid var(--edge); border-radius: 4px; font: inherit; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+  .bar { display: flex; align-items: center; gap: 1rem; padding: .6rem .9rem; border-bottom: 1px solid var(--edge); }
+  .widths { display: flex; gap: 2px; padding: 2px; background: var(--panel); border: 1px solid var(--edge); border-radius: 8px; }
+  .w { padding: .3rem .6rem; background: none; border: 0; border-radius: 6px; color: var(--soft); font: inherit; font-size: .75rem; cursor: pointer; }
+  .w.on { background: #2a2f3b; color: var(--ink); }
+  .now { font-size: .8125rem; color: var(--soft); }
+  #open { margin-left: auto; font-size: .75rem; color: var(--accent); text-decoration: none; }
+
+  .stage { flex: 1; display: grid; place-items: start center; padding: 1.25rem; overflow: auto; background: repeating-conic-gradient(#15171c 0% 25%, #121419 0% 50%) 0 0 / 18px 18px; }
+  iframe { width: var(--w, 390px); max-width: 100%; height: calc(100svh - 6.25rem); border: 1px solid var(--edge); border-radius: 10px; background: #fff; }
+
+  @media (max-width: 52rem) {
+    .app { grid-template-columns: minmax(0, 1fr); height: auto; }
+    aside { border-right: 0; border-bottom: 1px solid var(--edge); }
+    nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    iframe { height: 70svh; }
+  }
+</style>
