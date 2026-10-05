@@ -24,14 +24,15 @@ uses it.** This class of bug is invisible in a type check and invisible in the s
 
 ## Brand icons
 
-Using Instagram, GitHub, X, YouTube, LinkedIn etc. marks to link to the account you own is
-ordinary referential use and is fine. Pull the paths from [Simple Icons](https://simpleicons.org)
-rather than redrawing by eye — the SVG files are CC0, the marks themselves remain the
-owners' trademarks, which does not block this use.
+For links to platform accounts, use official assets or paths from
+[Simple Icons](https://simpleicons.org) rather than redrawing by eye. Check the icon's
+brand guidelines and licensing information: the collection's CC0 license does not grant
+trademark rights or override a brand's usage rules. See the
+[Simple Icons disclaimer](https://github.com/simple-icons/simple-icons/blob/develop/DISCLAIMER.md).
 
 Do not: redraw or restretch a mark, lock it up with the project's own logo, arrange it so it
-reads as sponsorship, or recolour a brand's gradient into something custom. Flat single-colour
-renderings are explicitly allowed by both Meta's and GitHub's guidelines.
+reads as sponsorship, or recolour a brand's gradient into something custom. Use a
+single-colour rendering only when the relevant brand's guidelines permit it.
 
 Third-party *products* are different from platforms. If there is an affiliate or partner
 relationship, use the asset pack that programme provides rather than scraping a favicon; the

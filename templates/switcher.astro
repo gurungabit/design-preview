@@ -2,29 +2,37 @@
 /*
   Design switcher — copy to <routes>/<preview-base>/index.astro
 
-  1. Replace PROJECT_NAME with the project's name.
-  2. Replace PREVIEW_BASE with this folder's route segment (e.g. "preview").
-  3. Fill the designs array below.
-  4. Create one route per id at /PREVIEW_BASE/<id>.
+  1. Set projectName and previewBase below.
+  2. Fill the variants array with unique positive integer ids.
+  3. Create one route per id at <previewBase>/<id>.
+
+  The configured Astro base path is included automatically.
 
   Do not restyle this page. It is deliberately neutral so it never competes
   with the variants it is showing.
 */
-// EDIT THIS ARRAY ONLY. One entry per variant.
+const projectName = 'PROJECT_NAME';
+const previewBase = 'preview'; // Folder under src/pages; nested paths are supported.
+
+// CONFIGURE THIS ARRAY. One entry per variant.
 // a = page ground, b = primary ink, c = accent. These draw the sidebar swatch,
 // so keep them honest — they are how the user scans the set at a glance.
-export const designs = [
+const variants = [
   { id: 1, name: 'Variant name', note: 'Three or four words', a: '#ffffff', b: '#111111', c: '#2563eb' },
   // ...
 ];
+const routeBase = import.meta.env.BASE_URL.replace(/\/$/, '') + '/' + previewBase.replace(/^\/+|\/+$/g, '');
+const designs = variants.map((d) => ({ ...d, href: routeBase + '/' + d.id }));
+const first = designs[0];
 ---
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light dark" />
-  <title>Design switcher — PROJECT_NAME</title>
+  <meta name="color-scheme" content="dark" />
+  <meta name="robots" content="noindex" />
+  <title>Design switcher — {projectName}</title>
   <link rel="icon" href="data:," />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet" />
 </head>
@@ -32,13 +40,13 @@ export const designs = [
   <div class="app">
     <aside>
       <header>
-        <h1>PROJECT_NAME</h1>
+        <h1>{projectName}</h1>
         <p>{designs.length} designs · pick one</p>
       </header>
-      <nav id="nav">
+      <nav id="nav" aria-label="Design variants">
         {designs.map((d) => (
           <button type="button" data-id={d.id} class="opt">
-            <span class="sw" style={`--a:${d.a};--b:${d.b};--c:${d.c}`}><i></i><i></i><i></i></span>
+            <span class="sw" aria-hidden="true" style={`--a:${d.a};--b:${d.b};--c:${d.c}`}><i></i><i></i><i></i></span>
             <span class="meta">
               <span class="nm"><b>{String(d.id).padStart(2, '0')}</b>{d.name}</span>
               <span class="nt">{d.note}</span>
@@ -58,56 +66,109 @@ export const designs = [
           <button type="button" data-w="768" class="w">Tablet</button>
           <button type="button" data-w="0" class="w">Full</button>
         </div>
-        <span class="now" id="now">01 · Quiet Editorial</span>
-        <a id="open" href="/PREVIEW_BASE/1" target="_blank" rel="noopener">Open ↗</a>
+        <span class="now" id="now" aria-live="polite" aria-atomic="true">{first ? String(first.id).padStart(2, '0') + ' · ' + first.name : 'No designs configured'}</span>
+        <a id="open" href={first?.href} hidden={!first} target="_blank" rel="noopener">Open ↗</a>
       </div>
       <div class="stage" id="stage">
-        <iframe id="frame" src="/PREVIEW_BASE/1" title="Design preview" loading="eager"></iframe>
+        <iframe id="frame" hidden={!first} title="Design preview" loading="eager"></iframe>
       </div>
     </main>
   </div>
 
+  <noscript><p class="notice">Enable JavaScript to switch designs, or use Open to view the first variant.</p></noscript>
   <script is:inline define:vars={{ designs }}>
-    const frame = document.getElementById('frame');
-    const stage = document.getElementById('stage');
-    const now   = document.getElementById('now');
-    const open  = document.getElementById('open');
-    const opts  = [...document.querySelectorAll('.opt')];
+    (() => {
+      const frame = document.getElementById('frame');
+      const stage = document.getElementById('stage');
+      const now = document.getElementById('now');
+      const open = document.getElementById('open');
+      const opts = [...document.querySelectorAll('.opt')];
+      const widths = [...document.querySelectorAll('.w')];
+      const pad = (n) => String(n).padStart(2, '0');
+      // Each switcher owns its state; storage may be unavailable in local previews.
+      const storageKey = 'design-preview:' + location.pathname;
+      const read = (key) => {
+        try { return localStorage.getItem(storageKey + ':' + key); }
+        catch { return null; }
+      };
+      const write = (key, value) => {
+        try { localStorage.setItem(storageKey + ':' + key, String(value)); }
+        catch { /* The preview still works without persistence. */ }
+      };
 
-    let current = Number(localStorage.getItem('dp-design')) || 1;
-    let width   = localStorage.getItem('dp-width') ?? '390';
+      if (!designs.length) {
+        now.textContent = 'No designs configured';
+        open.hidden = true;
+        frame.hidden = true;
+        widths.forEach((button) => { button.disabled = true; });
+        return;
+      }
 
-    function pad(n) { return String(n).padStart(2, '0'); }
+      const saved = Number(read('design'));
+      let current = designs.findIndex((d) => d.id === saved);
+      if (current < 0) current = 0;
+      let width = read('width');
+      if (!['390', '768', '0'].includes(width)) width = '390';
 
-    function render() {
-      const d = designs.find((x) => x.id === current) ?? designs[0];
-      if (!frame.src.endsWith('/PREVIEW_BASE/' + d.id)) frame.src = '/PREVIEW_BASE/' + d.id;
-      now.textContent = pad(d.id) + ' · ' + d.name;
-      open.href = '/PREVIEW_BASE/' + d.id;
-      opts.forEach((o) => o.setAttribute('aria-current', String(Number(o.dataset.id) === d.id)));
-      stage.style.setProperty('--w', width === '0' ? '100%' : width + 'px');
-      document.querySelectorAll('.w').forEach((b) => b.classList.toggle('on', b.dataset.w === width));
-      localStorage.setItem('dp-design', String(current));
-      localStorage.setItem('dp-width', width);
-    }
+      function render() {
+        const d = designs[current];
+        // Replacing the iframe location keeps switches out of Back history.
+        // Track the authored URL so resizing never reloads the variant.
+        if (frame.dataset.href !== d.href) {
+          frame.dataset.href = d.href;
+          try { frame.contentWindow.location.replace(new URL(d.href, location.href).href); }
+          catch { frame.src = d.href; }
+        }
+        frame.title = pad(d.id) + ' · ' + d.name + ' — Design preview';
+        now.textContent = pad(d.id) + ' · ' + d.name;
+        open.href = d.href;
+        open.setAttribute('aria-label', 'Open ' + d.name + ' in a new tab');
+        opts.forEach((o) => o.setAttribute('aria-current', String(Number(o.dataset.id) === d.id)));
+        stage.style.setProperty('--w', width === '0' ? 'calc(100% - 2px)' : width + 'px');
+        widths.forEach((b) => {
+          const selected = b.dataset.w === width;
+          b.classList.toggle('on', selected);
+          b.setAttribute('aria-pressed', String(selected));
+        });
+        write('design', d.id);
+        write('width', width);
+      }
 
-    opts.forEach((o) => o.addEventListener('click', () => { current = Number(o.dataset.id); render(); }));
-    document.querySelectorAll('.w').forEach((b) =>
-      b.addEventListener('click', () => { width = b.dataset.w; render(); })
-    );
-    addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight') { current = current % designs.length + 1; render(); }
-      if (e.key === 'ArrowLeft')  { current = (current - 2 + designs.length) % designs.length + 1; render(); }
-    });
+      opts.forEach((o) => o.addEventListener('click', () => {
+        current = designs.findIndex((d) => d.id === Number(o.dataset.id));
+        render();
+      }));
+      widths.forEach((b) => b.addEventListener('click', () => {
+        width = b.dataset.w;
+        render();
+      }));
+      addEventListener('keydown', (e) => {
+        if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+        if (e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]')) return;
+        const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        current = (current + step + designs.length) % designs.length;
+        render();
+        // Keep focus and the selected row together when navigating the sidebar.
+        if (opts.includes(document.activeElement)) {
+          opts[current].focus();
+          opts[current].scrollIntoView({ block: 'nearest' });
+        }
+      });
 
-    render();
+      render();
+    })();
   </script>
 </body>
 </html>
 
 <style>
+
+  /* switcher chrome — do not restyle */
   * { box-sizing: border-box; }
-  :root {
+  :global(:root) {
+    color-scheme: dark;
     --bg: #0f1013; --panel: #17191e; --edge: #262a32;
     --ink: #e9ebf0; --soft: #8d95a4; --accent: #7c8cff;
   }
@@ -118,10 +179,10 @@ export const designs = [
   aside header { padding: 1.15rem 1rem .75rem; }
   aside h1 { margin: 0; font-size: .9375rem; font-weight: 800; letter-spacing: -.02em; }
   aside header p { margin: .15rem 0 0; font-size: .75rem; color: var(--soft); }
-  nav { display: grid; gap: 2px; padding: .35rem .5rem; }
+  nav { min-width: 0; display: grid; gap: 2px; padding: .35rem .5rem; }
 
   .opt {
-    display: flex; align-items: center; gap: .7rem; width: 100%;
+    display: flex; align-items: center; gap: .7rem; width: 100%; min-width: 0; overflow-wrap: anywhere;
     padding: .55rem .6rem; background: none; border: 0; border-radius: 9px;
     color: inherit; font: inherit; text-align: left; cursor: pointer;
     transition: background-color 140ms ease;
@@ -141,21 +202,29 @@ export const designs = [
   aside footer { margin-top: auto; padding: .85rem 1rem; font-size: .6875rem; color: var(--soft); border-top: 1px solid var(--edge); }
   kbd { display: inline-block; padding: .05rem .3rem; margin-right: .2rem; border: 1px solid var(--edge); border-radius: 4px; font: inherit; }
 
-  main { display: flex; flex-direction: column; min-width: 0; }
-  .bar { display: flex; align-items: center; gap: 1rem; padding: .6rem .9rem; border-bottom: 1px solid var(--edge); }
-  .widths { display: flex; gap: 2px; padding: 2px; background: var(--panel); border: 1px solid var(--edge); border-radius: 8px; }
-  .w { padding: .3rem .6rem; background: none; border: 0; border-radius: 6px; color: var(--soft); font: inherit; font-size: .75rem; cursor: pointer; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; padding: .6rem .9rem; border-bottom: 1px solid var(--edge); }
+  .widths { flex: none; display: flex; gap: 2px; padding: 2px; background: var(--panel); border: 1px solid var(--edge); border-radius: 8px; }
+  .w { min-height: 44px; padding: .3rem .6rem; background: none; border: 0; border-radius: 6px; color: var(--soft); font: inherit; font-size: .75rem; cursor: pointer; }
   .w.on { background: #2a2f3b; color: var(--ink); }
-  .now { font-size: .8125rem; color: var(--soft); }
-  #open { margin-left: auto; font-size: .75rem; color: var(--accent); text-decoration: none; }
+  .now { min-width: 0; overflow-wrap: anywhere; font-size: .8125rem; color: var(--soft); }
+  #open { display: inline-flex; flex: none; align-items: center; min-height: 44px; margin-left: auto; font-size: .75rem; color: var(--accent); text-decoration: none; }
 
-  .stage { flex: 1; display: grid; place-items: start center; padding: 1.25rem; overflow: auto; background: repeating-conic-gradient(#15171c 0% 25%, #121419 0% 50%) 0 0 / 18px 18px; }
-  iframe { width: var(--w, 390px); max-width: 100%; height: calc(100svh - 6.25rem); border: 1px solid var(--edge); border-radius: 10px; background: #fff; }
+  .stage { flex: 1; min-width: 0; min-height: 0; display: flex; align-items: stretch; padding: 1.25rem; overflow: auto; background: repeating-conic-gradient(#15171c 0% 25%, #121419 0% 50%) 0 0 / 18px 18px; }
+  iframe { box-sizing: content-box; flex: none; margin-inline: auto; width: var(--w, 390px); height: auto; border: 1px solid var(--edge); border-radius: 10px; background: #fff; }
 
   @media (max-width: 52rem) {
     .app { grid-template-columns: minmax(0, 1fr); height: auto; }
     aside { border-right: 0; border-bottom: 1px solid var(--edge); }
-    nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    nav { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 20rem; overflow-y: auto; }
+    .now { order: 3; flex-basis: 100%; }
     iframe { height: 70svh; }
+  }
+
+  [hidden] { display: none !important; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .notice { padding: 1rem; color: var(--ink); }
+  @media (prefers-reduced-motion: reduce) {
+    .opt { transition: none; }
   }
 </style>
